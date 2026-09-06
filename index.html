@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Repaint — Smart Wall Paint Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1F1B1A;
+    --ink-soft:#332C2A;
+    --plaster:#F6F3EC;
+    --plaster-dim:#EDE8DC;
+    --line:#DED6C4;
+    --wet-teal:#2C6E63;
+    --wet-teal-dark:#1F4F47;
+    --mustard:#D9A441;
+    --brick:#A34E3D;
+    --paper:#FFFFFF;
+    --shadow: 0 10px 30px rgba(31,27,26,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--plaster);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---- Top bar ---- */
+  .topbar{
+    background:var(--ink);
+    color:var(--plaster);
+    padding:18px 32px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    z-index:50;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand-mark{
+    width:14px;height:14px;border-radius:3px;
+    background:linear-gradient(135deg,var(--wet-teal),var(--mustard));
+    display:inline-block;
+    transform:rotate(6deg);
+    box-shadow:0 2px 0 rgba(0,0,0,0.25);
+  }
+  .brand-name{font-family:'Fraunces',serif;font-weight:700;font-size:22px;letter-spacing:-0.02em;}
+  .brand-tag{font-size:11px;color:#B8B0A8;text-transform:uppercase;letter-spacing:0.12em;margin-left:4px;}
+  nav.tabs{display:flex;gap:4px;background:rgba(255,255,255,0.06);padding:4px;border-radius:10px;}
+  nav.tabs button{
+    background:transparent;border:none;color:#C9C1B8;
+    font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;
+    padding:8px 16px;border-radius:7px;cursor:pointer;transition:.15s;
+  }
+  nav.tabs button.active{background:var(--plaster);color:var(--ink);}
+  nav.tabs button:hover:not(.active){color:#fff;}
+  .userbox{display:flex;align-items:center;gap:10px;font-size:13px;color:#D8D1C8;}
+  .userbox button{
+    background:var(--wet-teal);color:#fff;border:none;padding:8px 14px;
+    border-radius:7px;font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .userbox button:hover{background:var(--wet-teal-dark);}
+
+  .page{max-width:1320px;margin:0 auto;padding:28px 32px 80px;}
+  .hidden{display:none !important;}
+
+  /* ---- Visualizer layout ---- */
+  .studio{display:grid;grid-template-columns:250px 1fr 300px;gap:20px;align-items:start;}
+  @media(max-width:1050px){.studio{grid-template-columns:1fr;}}
+
+  .panel{
+    background:var(--paper);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:18px;
+  }
+  .panel h3{font-size:14px;margin:0 0 14px;text-transform:uppercase;letter-spacing:0.08em;color:var(--ink-soft);font-family:'Inter',sans-serif;font-weight:700;}
+
+  .tool-btn{
+    display:flex;align-items:center;gap:10px;
+    width:100%;padding:11px 12px;margin-bottom:8px;
+    border:1.5px solid var(--line);border-radius:9px;background:var(--plaster);
+    cursor:pointer;font-family:'Inter',sans-serif;font-size:13.5px;font-weight:600;color:var(--ink);
+    transition:.12s;
+  }
+  .tool-btn:hover{border-color:var(--wet-teal);}
+  .tool-btn.active{background:var(--wet-teal);color:#fff;border-color:var(--wet-teal);}
+  .tool-icon{width:18px;text-align:center;font-size:15px;}
+
+  label.field-label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin:14px 0 6px;}
+  input[type=range]{width:100%;accent-color:var(--wet-teal);}
+  .range-val{font-size:11px;color:#8a8177;font-family:'IBM Plex Mono',monospace;}
+
+  .stack-btn{
+    width:100%;padding:10px;margin-top:8px;border-radius:9px;border:none;
+    font-family:'Inter',sans-serif;font-weight:700;font-size:13px;cursor:pointer;
+  }
+  .btn-ghost{background:var(--plaster-dim);color:var(--ink);border:1.5px solid var(--line) !important;}
+  .btn-ghost:hover{border-color:var(--ink);}
+  .btn-primary{background:var(--brick);color:#fff;}
+  .btn-primary:hover{background:#8a3f30;}
+  .btn-download{background:var(--ink);color:#fff;}
+  .btn-download:hover{background:var(--ink-soft);}
+
+  .canvas-wrap{
+    background:repeating-conic-gradient(#EFEAE0 0% 25%, #F6F3EC 0% 50%) 0 0/22px 22px;
+    border:1px solid var(--line);border-radius:14px;
+    display:flex;align-items:center;justify-content:center;
+    min-height:520px;position:relative;overflow:hidden;
+    padding:16px;
+  }
+  .canvas-stack{position:relative;line-height:0;}
+  canvas{max-width:100%;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.15);}
+  #overlayCanvas{position:absolute;top:0;left:0;cursor:crosshair;}
+
+  .empty-state{
+    text-align:center;color:#9c9186;
+  }
+  .empty-state .dropzone{
+    border:2px dashed #C9BFAF;border-radius:16px;padding:48px 60px;cursor:pointer;
+    background:rgba(255,255,255,0.5);transition:.15s;
+  }
+  .empty-state .dropzone:hover{border-color:var(--wet-teal);background:#fff;}
+  .empty-state .dropzone .big{font-size:38px;margin-bottom:10px;}
+  .empty-state h3{color:var(--ink);margin-bottom:6px;font-size:19px;}
+  .empty-state p{font-size:13.5px;color:#9c9186;margin:0;}
+
+  .canvas-toolbar{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:12px;font-size:12.5px;color:#8a8177;
+  }
+  .hint-pill{background:var(--plaster-dim);padding:6px 12px;border-radius:20px;border:1px solid var(--line);}
+  .before-after-btn{
+    background:var(--ink);color:#fff;border:none;padding:8px 14px;border-radius:8px;
+    font-family:'Inter',sans-serif;font-weight:600;font-size:12.5px;cursor:pointer;user-select:none;
+  }
+
+  /* Palette panel */
+  .swatch-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .swatch{
+    border-radius:10px;padding:9px 10px;cursor:pointer;border:2px solid transparent;
+    display:flex;flex-direction:column;gap:6px;transition:.12s;
+  }
+  .swatch .chip{width:100%;height:34px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.08);}
+  .swatch .name{font-size:11px;font-weight:600;color:var(--ink);}
+  .swatch .hex{font-size:10px;color:#9c9186;font-family:'IBM Plex Mono',monospace;}
+  .swatch.selected{border-color:var(--ink);background:var(--plaster-dim);}
+  .custom-color-row{display:flex;gap:8px;align-items:center;margin-top:12px;}
+  .custom-color-row input[type=color]{width:44px;height:34px;border:1.5px solid var(--line);border-radius:8px;padding:2px;background:none;cursor:pointer;}
+  .custom-color-row input[type=text]{flex:1;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+
+  .layer-list{margin-top:6px;}
+  .layer-row{
+    display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;
+    background:var(--plaster-dim);margin-bottom:6px;font-size:12px;
+  }
+  .layer-row .dot{width:16px;height:16px;border-radius:4px;flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1);}
+  .layer-row .lname{flex:1;}
+  .layer-row button{background:none;border:none;cursor:pointer;color:#a34e3d;font-weight:700;font-size:13px;}
+
+  /* Saved designs */
+  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;margin-top:20px;}
+  .g-card{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  .g-card img{width:100%;display:block;aspect-ratio:4/3;object-fit:cover;}
+  .g-card .meta{padding:12px 14px;}
+  .g-card .meta .title{font-weight:700;font-size:13.5px;margin-bottom:2px;}
+  .g-card .meta .sub{font-size:11.5px;color:#9c9186;}
+  .g-empty{padding:60px 20px;text-align:center;color:#9c9186;}
+
+  /* Admin */
+  .admin-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;}
+  @media(max-width:900px){.admin-grid{grid-template-columns:1fr;}}
+  .kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+  .kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .kpi .num{font-family:'Fraunces',serif;font-size:30px;font-weight:700;}
+  .kpi .lbl{font-size:11.5px;color:#9c9186;text-transform:uppercase;letter-spacing:0.06em;margin-top:2px;}
+  table.color-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.color-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9c9186;padding:8px 6px;border-bottom:1px solid var(--line);}
+  table.color-table td{padding:9px 6px;border-bottom:1px solid var(--plaster-dim);vertical-align:middle;}
+  table.color-table .chip-sm{width:22px;height:22px;border-radius:5px;display:inline-block;vertical-align:middle;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1);}
+  .del-link{color:var(--brick);cursor:pointer;font-weight:700;background:none;border:none;font-size:12px;}
+  .add-color-form{display:flex;flex-direction:column;gap:10px;}
+  .add-color-form input{padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-family:'Inter',sans-serif;font-size:13px;}
+
+  .page-header{margin-bottom:22px;}
+  .eyebrow{font-size:11.5px;text-transform:uppercase;letter-spacing:0.12em;color:var(--brick);font-weight:700;margin-bottom:6px;}
+  .page-header h1{font-size:30px;margin:0 0 8px;}
+  .page-header p{color:#7a7168;font-size:14.5px;max-width:640px;margin:0;line-height:1.5;}
+
+  /* About */
+  .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:10px;}
+  @media(max-width:850px){.about-grid{grid-template-columns:1fr;}}
+  .about-card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px 24px;}
+  .about-card h3{font-size:16px;margin:0 0 10px;}
+  .about-card ul{margin:0;padding-left:18px;color:#5c5349;font-size:13.5px;line-height:1.7;}
+
+  /* Modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(31,27,26,0.55);display:flex;align-items:center;justify-content:center;z-index:100;}
+  .modal{background:#fff;border-radius:14px;padding:28px;width:340px;box-shadow:var(--shadow);}
+  .modal h3{margin:0 0 6px;font-size:18px;}
+  .modal p{font-size:12.5px;color:#9c9186;margin:0 0 16px;}
+  .modal input{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;margin-bottom:14px;font-family:'Inter',sans-serif;}
+  .modal .row{display:flex;gap:10px;}
+  .modal button{flex:1;padding:10px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:12px 20px;border-radius:9px;font-size:13px;
+    box-shadow:var(--shadow);z-index:200;opacity:0;transition:.25s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,-6px);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <span class="brand-name">Repaint</span>
+    <span class="brand-tag">Wall Visualizer</span>
+  </div>
+  <nav class="tabs">
+    <button data-tab="studio" class="active">Visualizer</button>
+    <button data-tab="gallery">Saved Designs</button>
+    <button data-tab="admin">Admin</button>
+    <button data-tab="about">About</button>
+  </nav>
+  <div class="userbox">
+    <span id="userGreeting">Not signed in</span>
+    <button id="signInBtn">Sign in</button>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- STUDIO / VISUALIZER -->
+  <section id="tab-studio">
+    <div class="page-header">
+      <div class="eyebrow">Phase 1 · Manual selection</div>
+      <h1>See the colour before you buy the can.</h1>
+      <p>Upload a photo of your room, click a wall to select it, and try on real paint colours with realistic shading. Nothing here is saved to a server — everything happens in your browser.</p>
+    </div>
+
+    <div class="studio">
+      <!-- LEFT: tools -->
+      <div class="panel">
+        <h3>Tools</h3>
+        <button class="tool-btn active" id="tool-wand">
+          <span class="tool-icon">✨</span> Magic wall select
+        </button>
+        <button class="tool-btn" id="tool-lasso">
+          <span class="tool-icon">⬡</span> Draw selection (lasso)
+        </button>
+
+        <label class="field-label">Selection tolerance <span class="range-val" id="tolVal">30</span></label>
+        <input type="range" id="tolerance" min="5" max="90" value="30">
+
+        <label class="field-label">Paint intensity <span class="range-val" id="opVal">85%</span></label>
+        <input type="range" id="opacity" min="10" max="100" value="85">
+
+        <button class="stack-btn btn-primary" id="fillLassoBtn" style="display:none;">Apply colour to lasso area</button>
+
+        <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px;">
+          <button class="stack-btn btn-ghost" id="undoBtn">↩ Undo last coat</button>
+          <button class="stack-btn btn-ghost" id="resetBtn">Reset to original</button>
+        </div>
+
+        <div id="layerPanel" style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px;">
+          <label class="field-label" style="margin-top:0;">Painted walls</label>
+          <div class="layer-list" id="layerList"><span style="font-size:12px;color:#9c9186;">No walls painted yet.</span></div>
+        </div>
+      </div>
+
+      <!-- CENTER: canvas -->
+      <div>
+        <div class="canvas-toolbar">
+          <span class="hint-pill" id="hintPill">Upload a room photo to begin</span>
+          <button class="before-after-btn" id="beforeAfterBtn" style="display:none;">Hold to see original</button>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <div class="empty-state" id="emptyState">
+            <label class="dropzone" id="dropzone">
+              <div class="big">🖼️</div>
+              <h3>Drop a room photo here</h3>
+              <p>or click to browse · JPG or PNG</p>
+              <input type="file" id="fileInput" accept="image/png, image/jpeg" style="display:none;">
+            </label>
+          </div>
+          <div class="canvas-stack hidden" id="canvasStack">
+            <canvas id="baseCanvas"></canvas>
+            <canvas id="overlayCanvas"></canvas>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px;" id="actionRow">
+          <button class="stack-btn btn-download" id="downloadBtn" style="display:none;">⬇ Download image</button>
+          <button class="stack-btn btn-primary" id="saveDesignBtn" style="display:none;">Save this design</button>
+          <button class="stack-btn btn-ghost" id="newPhotoBtn" style="display:none;">Upload a different photo</button>
+        </div>
+      </div>
+
+      <!-- RIGHT: palette -->
+      <div class="panel">
+        <h3>Colour palette</h3>
+        <div class="swatch-grid" id="paletteGrid"></div>
+
+        <label class="field-label">Custom colour</label>
+        <div class="custom-color-row">
+          <input type="color" id="customColorPicker" value="#4A7C8C">
+          <input type="text" id="customColorHex" value="#4A7C8C" class="mono">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GALLERY -->
+  <section id="tab-gallery" class="hidden">
+    <div class="page-header">
+      <div class="eyebrow">Your projects</div>
+      <h1>Saved designs</h1>
+      <p>Designs you save in the Visualizer during this session show up here, so you can compare a few options side by side before deciding.</p>
+    </div>
+    <div id="galleryGrid" class="gallery-grid"></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="tab-admin" class="hidden">
+    <div class="page-header">
+      <div class="eyebrow">Admin panel</div>
+      <h1>Palette &amp; activity</h1>
+      <p>Manage the colours available to shoppers and keep an eye on how the visualizer is being used this session.</p>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi"><div class="num" id="kpiUploads">0</div><div class="lbl">Room images uploaded</div></div>
+      <div class="kpi"><div class="num" id="kpiSaved">0</div><div class="lbl">Designs saved</div></div>
+      <div class="kpi"><div class="num" id="kpiSession">0:00</div><div class="lbl">Session duration</div></div>
+    </div>
+
+    <div class="admin-grid">
+      <div class="panel">
+        <h3>Colour library</h3>
+        <table class="color-table">
+          <thead><tr><th></th><th>Name</th><th>Hex</th><th>Category</th><th></th></tr></thead>
+          <tbody id="adminColorRows"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h3>Add a colour</h3>
+        <div class="add-color-form">
+          <input type="text" id="newColorName" placeholder="Colour name (e.g. Morning Fog)">
+          <div class="custom-color-row" style="margin-top:0;">
+            <input type="color" id="newColorHex" value="#7C93A3">
+            <input type="text" id="newColorCat" placeholder="Category (e.g. Bedroom)" style="font-family:'Inter',sans-serif;">
+          </div>
+          <button class="stack-btn btn-primary" id="addColorBtn">Add to library</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="tab-about" class="hidden">
+    <div class="page-header">
+      <div class="eyebrow">Product requirements, in short</div>
+      <h1>What this demo covers</h1>
+      <p>This build implements the Phase 1 scope from the Smart Wall Paint Visualizer PRD, running entirely client-side so it can be tried without any backend deployed.</p>
+    </div>
+    <div class="about-grid">
+      <div class="about-card">
+        <h3>Implemented here</h3>
+        <ul>
+          <li>Room image upload (JPG/PNG)</li>
+          <li>Manual wall selection — magic-wand click and freehand lasso</li>
+          <li>Realistic recolouring that preserves shading and texture</li>
+          <li>Adjustable intensity, multiple walls per photo, undo</li>
+          <li>Before/after comparison</li>
+          <li>Save and download finished designs</li>
+          <li>Admin colour-library management and session KPIs</li>
+        </ul>
+      </div>
+      <div class="about-card">
+        <h3>Backend (separate download)</h3>
+        <ul>
+          <li>Node.js + Express REST API</li>
+          <li>MongoDB collections for Users, Projects, Colors, Patterns</li>
+          <li>JWT authentication middleware</li>
+          <li>Routes for auth, projects and colour-library CRUD</li>
+          <li>Matches the schema in the PRD's Data Requirements section</li>
+          <li>Ready to run locally or deploy to your own MongoDB + Node host</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div id="signInModal" class="modal-backdrop hidden">
+  <div class="modal">
+    <h3>Sign in</h3>
+    <p>Demo only — this stores your name in the browser tab, nothing is sent anywhere.</p>
+    <input type="text" id="signInName" placeholder="Your name">
+    <div class="row">
+      <button id="signInCancel" style="background:var(--plaster-dim);">Cancel</button>
+      <button id="signInConfirm" style="background:var(--wet-teal);color:#fff;">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- state ---------------- */
+  const state = {
+    userName: null,
+    uploadsCount: 0,
+    savedDesigns: [], // {id, name, thumb}
+    palette: [
+      {name:"Ocean Breeze Blue", hex:"#4A7C8C", cat:"Living Room"},
+      {name:"Sunset Coral", hex:"#E07856", cat:"Accent"},
+      {name:"Sage Whisper", hex:"#9CAF88", cat:"Bedroom"},
+      {name:"Warm Sand", hex:"#D9C4A3", cat:"Living Room"},
+      {name:"Charcoal Mist", hex:"#4A4A4A", cat:"Accent"},
+      {name:"Blush Petal", hex:"#E8B4B8", cat:"Bedroom"},
+      {name:"Golden Wheat", hex:"#D9A441", cat:"Kitchen"},
+      {name:"Deep Plum", hex:"#5B3758", cat:"Accent"}
+    ],
+    activeColor: {name:"Custom", hex:"#4A7C8C"},
+    tool: "wand",
+    tolerance: 30,
+    opacity: 85,
+    layers: [], // {mask: Uint8ClampedArray, color:{r,g,b}, opacity}
+    originalImageData: null,
+    canvasW: 0, canvasH: 0,
+    lassoPoints: [],
+    sessionStart: Date.now()
+  };
+
+  const els = {};
+  ["baseCanvas","overlayCanvas","canvasWrap","emptyState","canvasStack","dropzone","fileInput",
+   "hintPill","beforeAfterBtn","downloadBtn","saveDesignBtn","newPhotoBtn","paletteGrid",
+   "customColorPicker","customColorHex","tolerance","tolVal","opacity","opVal","fillLassoBtn",
+   "undoBtn","resetBtn","layerList","galleryGrid","adminColorRows","newColorName","newColorHex",
+   "newColorCat","addColorBtn","kpiUploads","kpiSaved","kpiSession","userGreeting","signInBtn",
+   "signInModal","signInName","signInCancel","signInConfirm","toast"
+  ].forEach(id => els[id] = document.getElementById(id));
+
+  const baseCtx = els.baseCanvas.getContext("2d", {willReadFrequently:true});
+  const overlayCtx = els.overlayCanvas.getContext("2d");
+
+  /* ---------------- tabs ---------------- */
+  document.querySelectorAll("nav.tabs button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      ["studio","gallery","admin","about"].forEach(t=>{
+        document.getElementById("tab-"+t).classList.toggle("hidden", t !== btn.dataset.tab);
+      });
+      if(btn.dataset.tab === "gallery") renderGallery();
+      if(btn.dataset.tab === "admin") renderAdmin();
+    });
+  });
+
+  /* ---------------- toast ---------------- */
+  let toastTimer;
+  function toast(msg){
+    els.toast.textContent = msg;
+    els.toast.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> els.toast.classList.remove("show"), 2200);
+  }
+
+  /* ---------------- sign in ---------------- */
+  els.signInBtn.addEventListener("click", ()=> els.signInModal.classList.remove("hidden"));
+  els.signInCancel.addEventListener("click", ()=> els.signInModal.classList.add("hidden"));
+  els.signInConfirm.addEventListener("click", ()=>{
+    const name = els.signInName.value.trim();
+    if(!name) return;
+    state.userName = name;
+    els.userGreeting.textContent = "Welcome, " + name;
+    els.signInBtn.textContent = "Sign out";
+    els.signInModal.classList.add("hidden");
+    toast("Signed in as " + name);
+  });
+  els.signInBtn.addEventListener("click", function reSignOut(){
+    if(state.userName){
+      // second click while signed in = sign out; handled by checking text
+    }
+  });
+  els.signInBtn.addEventListener("click", ()=>{
+    if(els.signInBtn.textContent === "Sign out"){
+      state.userName = null;
+      els.userGreeting.textContent = "Not signed in";
+      els.signInBtn.textContent = "Sign in";
+      toast("Signed out");
+    }
+  });
+
+  /* ---------------- palette rendering ---------------- */
+  function renderPalette(){
+    els.paletteGrid.innerHTML = "";
+    state.palette.forEach(c=>{
+      const div = document.createElement("div");
+      div.className = "swatch" + (state.activeColor.hex.toLowerCase()===c.hex.toLowerCase() ? " selected":"");
+      div.innerHTML = `<div class="chip" style="background:${c.hex}"></div><div class="name">${c.name}</div><div class="hex mono">${c.hex}</div>`;
+      div.addEventListener("click", ()=>{
+        state.activeColor = {name:c.name, hex:c.hex};
+        els.customColorPicker.value = c.hex;
+        els.customColorHex.value = c.hex;
+        renderPalette();
+      });
+      els.paletteGrid.appendChild(div);
+    });
+  }
+  renderPalette();
+
+  els.customColorPicker.addEventListener("input", ()=>{
+    els.customColorHex.value = els.customColorPicker.value;
+    state.activeColor = {name:"Custom", hex: els.customColorPicker.value};
+    renderPalette();
+  });
+  els.customColorHex.addEventListener("change", ()=>{
+    let v = els.customColorHex.value.trim();
+    if(/^#[0-9a-fA-F]{6}$/.test(v)){
+      els.customColorPicker.value = v;
+      state.activeColor = {name:"Custom", hex:v};
+      renderPalette();
+    } else {
+      toast("Enter a valid hex colour, e.g. #4A7C8C");
+    }
+  });
+
+  /* ---------------- tool switching ---------------- */
+  document.getElementById("tool-wand").addEventListener("click", ()=> setTool("wand"));
+  document.getElementById("tool-lasso").addEventListener("click", ()=> setTool("lasso"));
+  function setTool(t){
+    state.tool = t;
+    document.getElementById("tool-wand").classList.toggle("active", t==="wand");
+    document.getElementById("tool-lasso").classList.toggle("active", t==="lasso");
+    els.fillLassoBtn.style.display = (t==="lasso") ? "block":"none";
+    state.lassoPoints = [];
+    redrawOverlay();
+    els.hintPill.textContent = t==="wand"
+      ? "Click a wall in the photo to select and paint it"
+      : "Click to place points around the wall, double-click to close, then apply colour";
+  }
+
+  els.tolerance.addEventListener("input", ()=>{
+    state.tolerance = +els.tolerance.value;
+    els.tolVal.textContent = state.tolerance;
+  });
+  els.opacity.addEventListener("input", ()=>{
+    state.opacity = +els.opacity.value;
+    els.opVal.textContent = state.opacity + "%";
+  });
+
+  /* ---------------- image upload ---------------- */
+  els.dropzone.addEventListener("click", ()=> els.fileInput.click());
+  els.fileInput.addEventListener("change", e=>{
+    if(e.target.files[0]) loadImage(e.target.files[0]);
+  });
+  ["dragover","dragenter"].forEach(ev=>{
+    els.canvasWrap.addEventListener(ev, e=>{ e.preventDefault(); });
+  });
+  els.canvasWrap.addEventListener("drop", e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files[0]) loadImage(e.dataTransfer.files[0]);
+  });
+  els.newPhotoBtn.addEventListener("click", ()=> els.fileInput.click());
+
+  function loadImage(file){
+    if(!file.type.match(/image\/(png|jpeg)/)){ toast("Please upload a JPG or PNG image"); return; }
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      img.onload = ()=>{
+        const maxW = 820, maxH = 620;
+        let w = img.width, h = img.height;
+        const scale = Math.min(maxW/w, maxH/h, 1);
+        w = Math.round(w*scale); h = Math.round(h*scale);
+        state.canvasW = w; state.canvasH = h;
+        [els.baseCanvas, els.overlayCanvas].forEach(c=>{ c.width=w; c.height=h; });
+        baseCtx.drawImage(img, 0, 0, w, h);
+        state.originalImageData = baseCtx.getImageData(0,0,w,h);
+        state.layers = [];
+        renderLayerList();
+        els.emptyState.classList.add("hidden");
+        els.canvasStack.classList.remove("hidden");
+        els.downloadBtn.style.display = "block";
+        els.saveDesignBtn.style.display = "block";
+        els.newPhotoBtn.style.display = "block";
+        els.beforeAfterBtn.style.display = "inline-block";
+        els.hintPill.textContent = "Click a wall in the photo to select and paint it";
+        state.uploadsCount++;
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /* ---------------- colour math ---------------- */
+  function hexToRgb(hex){
+    const n = parseInt(hex.slice(1),16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
+  function rgbToHsl(r,g,b){
+    r/=255; g/=255; b/=255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b);
+    let h,s,l=(max+min)/2;
+    if(max===min){ h=s=0; }
+    else{
+      const d=max-min;
+      s = l>0.5 ? d/(2-max-min) : d/(max+min);
+      switch(max){
+        case r: h=(g-b)/d + (g<b?6:0); break;
+        case g: h=(b-r)/d + 2; break;
+        case b: h=(r-g)/d + 4; break;
+      }
+      h/=6;
+    }
+    return [h,s,l];
+  }
+  function hslToRgb(h,s,l){
+    let r,g,b;
+    if(s===0){ r=g=b=l; }
+    else{
+      const hue2rgb=(p,q,t)=>{
+        if(t<0) t+=1; if(t>1) t-=1;
+        if(t<1/6) return p+(q-p)*6*t;
+        if(t<1/2) return q;
+        if(t<2/3) return p+(q-p)*(2/3-t)*6;
+        return p;
+      };
+      const q = l<0.5 ? l*(1+s) : l+s-l*s;
+      const p = 2*l-q;
+      r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);
+    }
+    return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
+  }
+
+  /* ---------------- flood fill (magic wand) ---------------- */
+  function floodFillMask(imgData, sx, sy, tolerance, w, h){
+    const data = imgData.data;
+    const mask = new Uint8Array(w*h);
+    const idx0 = (sy*w+sx)*4;
+    const sr=data[idx0], sg=data[idx0+1], sb=data[idx0+2];
+    const tol = tolerance*tolerance*3; // squared distance threshold scaled
+    const visited = new Uint8Array(w*h);
+    const stack = [sy*w+sx];
+    visited[sy*w+sx]=1;
+    while(stack.length){
+      const p = stack.pop();
+      const px = p % w, py = (p / w) | 0;
+      const di = p*4;
+      const dr = data[di]-sr, dg = data[di+1]-sg, db = data[di+2]-sb;
+      const dist = dr*dr+dg*dg+db*db;
+      if(dist > tol) continue;
+      mask[p] = 255;
+      // neighbors
+      if(px>0){ const n=p-1; if(!visited[n]){visited[n]=1; stack.push(n);} }
+      if(px<w-1){ const n=p+1; if(!visited[n]){visited[n]=1; stack.push(n);} }
+      if(py>0){ const n=p-w; if(!visited[n]){visited[n]=1; stack.push(n);} }
+      if(py<h-1){ const n=p+w; if(!visited[n]){visited[n]=1; stack.push(n);} }
+    }
+    return mask;
+  }
+
+  /* ---------------- lasso rasterize ---------------- */
+  function lassoToMask(points, w, h){
+    const off = document.createElement("canvas");
+    off.width=w; off.height=h;
+    const octx = off.getContext("2d");
+    octx.fillStyle="#fff";
+    octx.beginPath();
+    octx.moveTo(points[0][0], points[0][1]);
+    for(let i=1;i<points.length;i++) octx.lineTo(points[i][0], points[i][1]);
+    octx.closePath();
+    octx.fill();
+    const data = octx.getImageData(0,0,w,h).data;
+    const mask = new Uint8Array(w*h);
+    for(let i=0;i<w*h;i++) mask[i] = data[i*4+3] > 128 ? 255 : 0;
+    return mask;
+  }
+
+  /* ---------------- apply layers & render ---------------- */
+  function renderComposite(){
+    const w=state.canvasW, h=state.canvasH;
+    const out = new ImageData(new Uint8ClampedArray(state.originalImageData.data), w, h);
+    const src = state.originalImageData.data;
+    const dst = out.data;
+    state.layers.forEach(layer=>{
+      const {mask, color, opacity} = layer;
+      const [th, ts] = rgbToHsl(color.r, color.g, color.b);
+      const targetH = th, targetS = ts;
+      const op = opacity/100;
+      for(let i=0;i<mask.length;i++){
+        if(!mask[i]) continue;
+        const di = i*4;
+        const r=src[di], g=src[di+1], b=src[di+2];
+        const [,, l] = rgbToHsl(r,g,b);
+        // keep lightness, slightly compress towards mid so very dark/light areas still take colour
+        const adjL = l*0.85 + 0.5*0.15;
+        const [nr,ng,nb] = hslToRgb(targetH, targetS, l===0? adjL : l);
+        dst[di]   = r + (nr - r) * op;
+        dst[di+1] = g + (ng - g) * op;
+        dst[di+2] = b + (nb - b) * op;
+      }
+    });
+    baseCtx.putImageData(out, 0, 0);
+  }
+
+  function renderLayerList(){
+    if(state.layers.length===0){
+      els.layerList.innerHTML = '<span style="font-size:12px;color:#9c9186;">No walls painted yet.</span>';
+      return;
+    }
+    els.layerList.innerHTML = "";
+    state.layers.forEach((layer, idx)=>{
+      const row = document.createElement("div");
+      row.className = "layer-row";
+      row.innerHTML = `<span class="dot" style="background:rgb(${layer.color.r},${layer.color.g},${layer.color.b})"></span>
+        <span class="lname">${layer.colorName} · ${layer.opacity}%</span>
+        <button data-idx="${idx}">✕</button>`;
+      row.querySelector("button").addEventListener("click", ()=>{
+        state.layers.splice(idx,1);
+        renderComposite(); renderLayerList();
+      });
+      els.layerList.appendChild(row);
+    });
+  }
+
+  /* ---------------- canvas interactions ---------------- */
+  function canvasCoords(e){
+    const rect = els.overlayCanvas.getBoundingClientRect();
+    const scaleX = els.overlayCanvas.width / rect.width;
+    const scaleY = els.overlayCanvas.height / rect.height;
+    return [
+      Math.max(0, Math.min(state.canvasW-1, Math.round((e.clientX-rect.left)*scaleX))),
+      Math.max(0, Math.min(state.canvasH-1, Math.round((e.clientY-rect.top)*scaleY)))
+    ];
+  }
+
+  els.overlayCanvas.addEventListener("click", e=>{
+    if(!state.originalImageData) return;
+    const [x,y] = canvasCoords(e);
+    if(state.tool === "wand"){
+      const current = baseCtx.getImageData(0,0,state.canvasW,state.canvasH);
+      const mask = floodFillMask(current, x, y, state.tolerance, state.canvasW, state.canvasH);
+      const rgb = hexToRgb(state.activeColor.hex);
+      state.layers.push({mask, color:rgb, colorName:state.activeColor.name, opacity: state.opacity});
+      renderComposite();
+      renderLayerList();
+      toast("Wall painted with " + state.activeColor.name);
+    } else if(state.tool === "lasso"){
+      state.lassoPoints.push([x,y]);
+      redrawOverlay();
+    }
+  });
+
+  els.overlayCanvas.addEventListener("dblclick", e=>{
+    if(state.tool === "lasso" && state.lassoPoints.length>2){
+      // keep points, ready to apply
+      redrawOverlay(true);
+    }
+  });
+
+  function redrawOverlay(closed){
+    overlayCtx.clearRect(0,0,state.canvasW,state.canvasH);
+    if(state.tool==="lasso" && state.lassoPoints.length){
+      overlayCtx.strokeStyle = "#1F1B1A";
+      overlayCtx.lineWidth = 2;
+      overlayCtx.setLineDash([6,4]);
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(state.lassoPoints[0][0], state.lassoPoints[0][1]);
+      state.lassoPoints.slice(1).forEach(p=> overlayCtx.lineTo(p[0], p[1]));
+      if(closed) overlayCtx.closePath();
+      overlayCtx.stroke();
+      state.lassoPoints.forEach(p=>{
+        overlayCtx.fillStyle="#D9A441";
+        overlayCtx.beginPath(); overlayCtx.arc(p[0],p[1],4,0,Math.PI*2); overlayCtx.fill();
+      });
+    }
+  }
+
+  els.fillLassoBtn.addEventListener("click", ()=>{
+    if(state.lassoPoints.length < 3){ toast("Add at least 3 points to close a shape"); return; }
+    const mask = lassoToMask(state.lassoPoints, state.canvasW, state.canvasH);
+    const rgb = hexToRgb(state.activeColor.hex);
+    state.layers.push({mask, color:rgb, colorName:state.activeColor.name, opacity: state.opacity});
+    renderComposite();
+    renderLayerList();
+    state.lassoPoints = [];
+    redrawOverlay();
+    toast("Selection painted with " + state.activeColor.name);
+  });
+
+  els.undoBtn.addEventListener("click", ()=>{
+    if(!state.layers.length) return;
+    state.layers.pop();
+    renderComposite();
+    renderLayerList();
+  });
+  els.resetBtn.addEventListener("click", ()=>{
+    state.layers = [];
+    renderComposite();
+    renderLayerList();
+    state.lassoPoints = [];
+    redrawOverlay();
+    toast("Reset to original photo");
+  });
+
+  /* before / after hold */
+  let holdingBefore = false;
+  els.beforeAfterBtn.addEventListener("mousedown", ()=>{
+    if(!state.originalImageData) return;
+    holdingBefore = true;
+    baseCtx.putImageData(state.originalImageData, 0, 0);
+  });
+  ["mouseup","mouseleave"].forEach(ev=>{
+    els.beforeAfterBtn.addEventListener(ev, ()=>{
+      if(holdingBefore){ holdingBefore=false; renderComposite(); }
+    });
+  });
+
+  /* download */
+  els.downloadBtn.addEventListener("click", ()=>{
+    const link = document.createElement("a");
+    link.download = "repaint-design.png";
+    link.href = els.baseCanvas.toDataURL("image/png");
+    link.click();
+  });
+
+  /* save design */
+  els.saveDesignBtn.addEventListener("click", ()=>{
+    const thumb = els.baseCanvas.toDataURL("image/png");
+    state.savedDesigns.push({
+      id: Date.now(),
+      name: "Design " + (state.savedDesigns.length+1),
+      thumb,
+      colors: state.layers.map(l=>l.colorName).join(", ") || "Original"
+    });
+    toast("Design saved — see the Saved Designs tab");
+  });
+
+  /* ---------------- gallery ---------------- */
+  function renderGallery(){
+    if(!state.savedDesigns.length){
+      els.galleryGrid.innerHTML = '<div class="g-empty">No designs saved yet. Paint a wall in the Visualizer and click "Save this design."</div>';
+      return;
+    }
+    els.galleryGrid.innerHTML = "";
+    state.savedDesigns.slice().reverse().forEach(d=>{
+      const card = document.createElement("div");
+      card.className = "g-card";
+      card.innerHTML = `<img src="${d.thumb}"><div class="meta"><div class="title">${d.name}</div><div class="sub">${d.colors}</div></div>`;
+      els.galleryGrid.appendChild(card);
+    });
+  }
+
+  /* ---------------- admin ---------------- */
+  function renderAdmin(){
+    els.adminColorRows.innerHTML = "";
+    state.palette.forEach((c,idx)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td><span class="chip-sm" style="background:${c.hex}"></span></td>
+        <td>${c.name}</td><td class="mono">${c.hex}</td><td>${c.cat}</td>
+        <td><button class="del-link" data-idx="${idx}">Remove</button></td>`;
+      tr.querySelector("button").addEventListener("click", ()=>{
+        state.palette.splice(idx,1);
+        renderAdmin(); renderPalette();
+      });
+      els.adminColorRows.appendChild(tr);
+    });
+    els.kpiUploads.textContent = state.uploadsCount;
+    els.kpiSaved.textContent = state.savedDesigns.length;
+  }
+
+  els.addColorBtn.addEventListener("click", ()=>{
+    const name = els.newColorName.value.trim();
+    const hex = els.newColorHex.value;
+    const cat = els.newColorCat.value.trim() || "General";
+    if(!name){ toast("Give the colour a name first"); return; }
+    state.palette.push({name, hex, cat});
+    els.newColorName.value = "";
+    renderAdmin();
+    renderPalette();
+    toast(name + " added to the colour library");
+  });
+
+  /* session timer */
+  setInterval(()=>{
+    const secs = Math.floor((Date.now()-state.sessionStart)/1000);
+    const m = Math.floor(secs/60), s = secs%60;
+    els.kpiSession.textContent = m + ":" + String(s).padStart(2,"0");
+  }, 1000);
+
+})();
+</script>
+</body>
+</html>
